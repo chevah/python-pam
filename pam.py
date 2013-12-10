@@ -14,6 +14,8 @@ __all__ = ['authenticate']
 from ctypes import CDLL, POINTER, Structure, CFUNCTYPE, cast, pointer, sizeof
 from ctypes import c_void_p, c_uint, c_char_p, c_char, c_int
 from ctypes.util import find_library
+import os
+import sys
 
 
 def load_library(nickname, search_names=None):
@@ -43,8 +45,43 @@ def load_library(nickname, search_names=None):
     if library is None:
         raise AssertionError("Failed to load '%s' library." % (nickname))
 
-LIBPAM = load_library('pam', ['libpam.so', 'libpam.so.0', 'libpam.so.1'])
-LIBC = load_library('c', ['libc.so', 'libc.so.6', 'libc.so.5'])
+
+def load_library_from_aix_archive(path, member_name='shr.o'):
+    """
+    Extract the shared object from the archive and load it as a normal
+    library.
+    """
+    import atexit
+    import tempfile
+
+    import arpy
+
+    def remove_file_at_exit(path):
+        # Reimport os as it might be removed at exit.
+        import os
+        os.remove(path)
+
+    archive = arpy.AIXBigArchive(path)
+    archive.read_all_headers()
+    member = archive.archived_files[member_name]
+    temp_file = None
+    try:
+        temp_fd, path = tempfile.mkstemp()
+        temp_file = os.fdopen(temp_fd, 'wb')
+        atexit.register(remove_file_at_exit, path)
+        temp_file.write(member.read())
+    finally:
+        if temp_file:
+            temp_file.close()
+    return CDLL(path)
+
+
+if sys.platform.startswith('aix'):
+    LIBPAM = load_library_from_aix_archive('/lib/libpam.a')
+    LIBC = load_library_from_aix_archive('/lib/libc.a')
+else:
+    LIBPAM = load_library('pam', ['libpam.so', 'libpam.so.0', 'libpam.so.1'])
+    LIBC = load_library('c', ['libc.so', 'libc.so.6', 'libc.so.5'])
 
 CALLOC = LIBC.calloc
 CALLOC.restype = c_void_p

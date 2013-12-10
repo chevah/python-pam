@@ -1,6 +1,6 @@
 from setuptools import setup
 
-version = '0.1.4.chevah'
+version = '0.1.4.c3'
 
 setup(name='pam',
       version=version,

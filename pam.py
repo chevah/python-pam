@@ -177,14 +177,17 @@ def authenticate(username, password, service='login'):
         p_response[0] = cast(addr, POINTER(PamResponse))
         for i in range(n_messages):
             if messages[i].contents.msg_style == PAM_PROMPT_ECHO_OFF:
-                pw_copy = STRDUP(str(password))
+                pw_copy = STRDUP(password.encode('utf-8'))
                 p_response.contents[i].resp = cast(pw_copy, POINTER(c_char))
                 p_response.contents[i].resp_retcode = 0
         return 0
 
     handle = PamHandle()
     conv = PamConv(my_conv, 0)
-    retval = PAM_START(service, username, pointer(conv), pointer(handle))
+    retval = PAM_START(
+        service.encode('utf-8'),
+        username.encode('utf-8'),
+        pointer(conv), pointer(handle))
 
     if retval != 0:
         # TODO: This is not an authentication error, something
@@ -198,4 +201,4 @@ def authenticate(username, password, service='login'):
 
 if __name__ == "__main__":
     import getpass
-    print authenticate(getpass.getuser(), getpass.getpass())
+    print(authenticate(getpass.getuser(), getpass.getpass()))
